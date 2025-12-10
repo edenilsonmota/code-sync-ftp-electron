@@ -2,7 +2,7 @@
 
 O **CodeSyncFtp** é um aplicativo desktop leve que monitora pastas locais e faz upload automático de arquivos alterados para um servidor FTP. Foi criado para suprir a falta de sincronização robusta em editores como **Zed** e **Cursor**, mas funciona com **VS Code**, **Sublime Text**, **Notepad++** ou qualquer outro editor.
 
-<img src="Screenshot.png" width="600"/>
+<img src="Screenshot.png"/>
 
 ## ✨ Funcionalidades
 
@@ -41,4 +41,5 @@ cd code-sync-ftp
 npm install
 
 # Inicie em modo de desenvolvimento
+
 npm start
