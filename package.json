@@ -1,0 +1,50 @@
+{
+  "name": "code-sync-ftp",
+  "version": "1.0.0",
+  "description": "Ferramenta de sincronização FTP automática",
+  "author": "Edenilson Mota",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.edenilson.codesyncftp",
+    "productName": "CodeSyncFtp",
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icon.ico"
+    },
+    "linux": {
+          "target": [
+            "AppImage"
+          ],
+          "icon": "icon.png",
+          "category": "Development"
+        },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "CodeSyncFtp"
+    },
+    "files": [
+      "**/*",
+      "!**/*.ts",
+      "!*.map",
+      "!**/*.md",
+      "!dist/**/*"
+    ]
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.0",
+    "chokidar": "^3.5.0",
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

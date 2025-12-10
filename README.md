@@ -1,0 +1,44 @@
+# 🚀 Ferramenta de sincronização FTP automática.
+
+O **CodeSyncFtp** é um aplicativo desktop leve que monitora pastas locais e faz upload automático de arquivos alterados para um servidor FTP. Foi criado para suprir a falta de sincronização robusta em editores como **Zed** e **Cursor**, mas funciona com **VS Code**, **Sublime Text**, **Notepad++** ou qualquer outro editor.
+
+<img src="Screenshot.png" width="600"/>
+
+## ✨ Funcionalidades
+
+- **Monitoramento em Tempo Real:** Salvou o arquivo, ele sobe instantaneamente.
+- **Multi-Projetos:** Gerencie múltiplos mapeamentos (Local ↔ Remoto) simultaneamente.
+- **Cross-Platform:** Disponível para Windows e Linux.
+
+## 📦 Instalação
+
+Acesse a aba [Releases](https://github.com/edenilsonmota/code-sync-ftp-electron/releases) deste repositório e baixe a última versão:
+
+- **Windows:** Baixe o arquivo `CodeSyncFtp Setup 1.0.0.exe`
+- **Linux:** Baixe o arquivo `CodeSyncFtp-1.0.0.AppImage`
+
+## 🛠️ Como Usar
+
+1. **Configuração FTP:** Preencha Host, Usuário, Senha e Porta.
+2. **Adicionar Projeto:**
+   - Selecione a **Pasta Local** no seu computador.
+   - Digite o caminho da **Pasta Remota** no servidor (ex: `/public_html/site`).
+3. **Iniciar:** Clique em **INICIAR SYNC**.
+4. **Trabalhar:** Abra seu editor favorito e comece a codar. O CodeSyncFtp fará o resto.
+
+## 💻 Desenvolvimento (Rodar localmente)
+
+Se você quiser clonar e editar o código fonte:
+
+```bash
+# Clone o repositório
+git clone https://github.com/edenilsonmota/code-sync-ftp-electron.git
+
+# Entre na pasta
+cd code-sync-ftp
+
+# Instale as dependências
+npm install
+
+# Inicie em modo de desenvolvimento
+npm start
