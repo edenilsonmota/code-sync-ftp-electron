@@ -3,20 +3,23 @@ const path = require('path');
 const Store = require('electron-store');
 const ftp = require("basic-ftp");
 const chokidar = require("chokidar");
-const fs = require('fs');
 
-const store = new Store(); // Para salvar configurações
+const store = new Store();
+
 let mainWindow;
-let watcher = null;
+let watchers = [];
 const client = new ftp.Client();
+
+let uploadQueue = [];      
+let isUploading = false;   
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 900,
-        height: 700,
-        autoHideMenuBar: true,
+        width: 1000,
+        height: 750,
+        autoHideMenuBar: true, // Esconde a barra de menu
         webPreferences: {
-            nodeIntegration: true, // Habilita Node no Front (para simplificar)
+            nodeIntegration: true,
             contextIsolation: false
         }
     });
@@ -50,11 +53,13 @@ ipcMain.handle('select-folder', async () => {
 // 4. INICIAR O SYNC
 ipcMain.on('start-sync', async (event, config) => {
     sendLog("🚀 Iniciando serviço...", "info");
+    await stopAllWatchers();
     
-    // Configura Watcher
-    const localPaths = config.projects.map(p => p.local);
-    
-    if (localPaths.length === 0) {
+    // Reseta a fila
+    uploadQueue = [];
+    isUploading = false;
+
+    if (!config.projects || config.projects.length === 0) {
         sendLog("⚠️ Nenhuma pasta configurada!", "error");
         return;
     }
@@ -71,72 +76,140 @@ ipcMain.on('start-sync', async (event, config) => {
         sendLog("✅ Conexão FTP estabelecida!", "success");
     } catch (err) {
         sendLog(`❌ Erro FTP: ${err.message}`, "error");
-        return; // Não inicia watcher se FTP falhar
+        return;
     }
 
-    // Inicia Chokidar
-    watcher = chokidar.watch(localPaths, {
-        ignored: /node_modules|\.git|\.vscode|desktop\.ini/,
+    // Cria um vigia para cada projeto (Melhor controle)
+    config.projects.forEach(proj => {
+        createProjectWatcher(proj, config);
+    });
+
+    sendLog(`👀 Monitorando ${config.projects.length} projetos...`, "info");
+});
+
+ipcMain.on('stop-sync', async () => {
+    await stopAllWatchers();
+    client.close();
+    uploadQueue = []; 
+    isUploading = false;
+    sendLog("🛑 Serviço parado.", "error");
+});
+
+// --- WATCHER INTELIGENTE ---
+
+function createProjectWatcher(project, globalConfig) {
+    // Prepara lista de ignorados do usuário
+    const userIgnored = project.ignored 
+        ? project.ignored.split(',').map(item => item.trim().toLowerCase()) 
+        : [];
+
+    const systemIgnored = [/node_modules/, /\.git/, /\.vscode/, /desktop\.ini/];
+
+    const w = chokidar.watch(project.local, {
+        ignored: systemIgnored,
         persistent: true,
         ignoreInitial: true,
         awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 }
     });
 
-    watcher.on('all', async (event, fullPath) => {
-        // Ignora eventos de diretório, foca em arquivos
-        if (event === 'addDir' || event === 'unlinkDir') return;
-        if (event === 'unlink') return; // Opcional: tratar deleção
+    w.on('all', async (event, fullPath) => {
+        if (event === 'addDir' || event === 'unlinkDir' || event === 'unlink') return;
+        
+        // --- FILTRO MANUAL (Ignorar arquivos específicos) ---
+        const fileName = path.basename(fullPath).toLowerCase();
+        
+        const shouldIgnore = userIgnored.some(rule => {
+            if (rule.startsWith('*')) { 
+                return fileName.endsWith(rule.replace('*', ''));
+            }
+            return fileName === rule;
+        });
 
-        await handleUpload(fullPath, config);
+        if (shouldIgnore) {
+            sendLog(`🚫 Ignorado: ${path.basename(fullPath)}`, "info");
+            return;
+        }
+
+        // --- ENVIA PARA A FILA EM VEZ DE SUBIR DIRETO ---
+        addToQueue(fullPath, project, globalConfig);
     });
 
-    sendLog(`👀 Monitorando ${config.projects.length} pastas...`, "info");
-});
+    watchers.push(w);
+}
 
-// 5. PARAR O SYNC
-ipcMain.on('stop-sync', async () => {
-    if (watcher) {
-        await watcher.close();
-        watcher = null;
+async function stopAllWatchers() {
+    for (const w of watchers) {
+        await w.close();
     }
-    client.close();
-    sendLog("🛑 Serviço parado.", "error");
-});
+    watchers = [];
+}
 
-// --- LÓGICA DE UPLOAD ---
+// --- SISTEMA DE FILA (QUEUE) ---
 
-async function handleUpload(fullPath, config) {
-    // Descobre qual projeto é dono desse arquivo
-    const project = config.projects.find(p => fullPath.startsWith(path.resolve(p.local)));
-    
-    if (!project) return;
+function addToQueue(fullPath, projectConfig, globalConfig) {
+    uploadQueue.push({ fullPath, projectConfig, globalConfig });
+    processQueue();
+}
 
-    // Normaliza caminhos
-    const relativePath = path.relative(project.local, fullPath);
-    const remotePath = (project.remote + "/" + relativePath).split(path.sep).join(path.posix.sep).replace('//', '/');
+async function processQueue() {
+    // Se já tem algo subindo, espera.
+    if (isUploading || uploadQueue.length === 0) return;
+
+    isUploading = true; // Bloqueia
+    const task = uploadQueue.shift(); // Pega o primeiro
+
+    try {
+        await handleUpload(task.fullPath, task.projectConfig, task.globalConfig);
+    } catch (err) {
+        console.error("Erro na fila:", err);
+    } finally {
+        isUploading = false; // Libera
+        
+        // Se ainda tem arquivos, processa o próximo
+        if (uploadQueue.length > 0) {
+            processQueue();
+        } else {
+            sendLog("🏁 Todos os arquivos foram sincronizados.", "info");
+        }
+    }
+}
+
+async function handleUpload(fullPath, projectConfig, globalConfig) {
+    const relativePath = path.relative(projectConfig.local, fullPath);
+    const remotePath = (projectConfig.remote + "/" + relativePath)
+        .split(path.sep).join(path.posix.sep)
+        .replace('//', '/');
 
     try {
         if (client.closed) {
             await client.access({
-                host: config.host,
-                user: config.user,
-                password: config.password,
-                port: parseInt(config.port) || 21,
+                host: globalConfig.host,
+                user: globalConfig.user,
+                password: globalConfig.password,
+                port: parseInt(globalConfig.port) || 21,
                 secure: false
             });
         }
 
-        sendLog(`⬆️ Uploading: ${relativePath}`, "info");
+        sendLog(`⬆️ [${path.basename(projectConfig.local)}] Enviando: ${relativePath}`, "info");
+        
         await client.ensureDir(path.dirname(remotePath));
         await client.uploadFrom(fullPath, remotePath);
-        sendLog(`✅ Sucesso: ${remotePath}`, "success");
+        
+        sendLog(`✅ Sucesso: ${relativePath}`, "success");
 
     } catch (err) {
         sendLog(`❌ Falha: ${err.message}`, "error");
-        client.close();
     }
 }
 
 function sendLog(msg, type) {
-    if (mainWindow) mainWindow.webContents.send('log-msg', { msg, type, time: new Date().toLocaleTimeString() });
+    if (mainWindow) {
+        mainWindow.webContents.send('log-msg', { 
+            msg, 
+            type, 
+            time: new Date().toLocaleTimeString() 
+        });
+    }
+    console.log(`[${type}] ${msg}`);
 }

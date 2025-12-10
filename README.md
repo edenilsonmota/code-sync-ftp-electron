@@ -7,6 +7,7 @@ O **CodeSyncFtp** é um aplicativo desktop leve que monitora pastas locais e faz
 ## ✨ Funcionalidades
 
 - **Monitoramento em Tempo Real:** Salvou o arquivo, ele sobe instantaneamente.
+- **Monitoramente git:** A cada novo pull, arquivos salvos automaticamente.
 - **Multi-Projetos:** Gerencie múltiplos mapeamentos (Local ↔ Remoto) simultaneamente.
 - **Cross-Platform:** Disponível para Windows e Linux.
 
