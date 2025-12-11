@@ -10,8 +10,9 @@ let mainWindow;
 let watchers = [];
 const client = new ftp.Client();
 
-let uploadQueue = [];      
-let isUploading = false;   
+// Fila agora vai guardar o "tipo" de ação também (upload ou delete)
+let taskQueue = [];      
+let isProcessing = false;   
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -55,9 +56,8 @@ ipcMain.on('start-sync', async (event, config) => {
     sendLog("🚀 Iniciando serviço...", "info");
     await stopAllWatchers();
     
-    // Reseta a fila
-    uploadQueue = [];
-    isUploading = false;
+    taskQueue = [];
+    isProcessing = false;
 
     if (!config.projects || config.projects.length === 0) {
         sendLog("⚠️ Nenhuma pasta configurada!", "error");
@@ -79,7 +79,6 @@ ipcMain.on('start-sync', async (event, config) => {
         return;
     }
 
-    // Cria um vigia para cada projeto (Melhor controle)
     config.projects.forEach(proj => {
         createProjectWatcher(proj, config);
     });
@@ -90,8 +89,8 @@ ipcMain.on('start-sync', async (event, config) => {
 ipcMain.on('stop-sync', async () => {
     await stopAllWatchers();
     client.close();
-    uploadQueue = []; 
-    isUploading = false;
+    taskQueue = []; 
+    isProcessing = false;
     sendLog("🛑 Serviço parado.", "error");
 });
 
@@ -112,26 +111,40 @@ function createProjectWatcher(project, globalConfig) {
         awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 }
     });
 
+    // MUDANÇA: Agora escutamos 'all' e tratamos cada tipo
     w.on('all', async (event, fullPath) => {
-        if (event === 'addDir' || event === 'unlinkDir' || event === 'unlink') return;
-        
-        // --- FILTRO MANUAL (Ignorar arquivos específicos) ---
+        // Ignora criação de pastas vazias (addDir), pois o upload de arquivo já cria a pasta.
+        if (event === 'addDir') return; 
+
+        // Filtro de Ignorados
         const fileName = path.basename(fullPath).toLowerCase();
-        
         const shouldIgnore = userIgnored.some(rule => {
-            if (rule.startsWith('*')) { 
-                return fileName.endsWith(rule.replace('*', ''));
-            }
+            if (rule.startsWith('*')) return fileName.endsWith(rule.replace('*', ''));
             return fileName === rule;
         });
 
         if (shouldIgnore) {
-            sendLog(`🚫 Ignorado: ${path.basename(fullPath)}`, "info");
+            // Só loga se não for exclusão (para não poluir log de coisas que já sumiram)
+            if (event !== 'unlink' && event !== 'unlinkDir') {
+                sendLog(`🚫 Ignorado: ${path.basename(fullPath)}`, "info");
+            }
             return;
         }
 
-        // --- ENVIA PARA A FILA EM VEZ DE SUBIR DIRETO ---
-        addToQueue(fullPath, project, globalConfig);
+        // --- DEFINE A AÇÃO ---
+        let action = null;
+        
+        if (event === 'add' || event === 'change') {
+            action = 'upload';
+        } else if (event === 'unlink') {
+            action = 'delete_file';
+        } else if (event === 'unlinkDir') {
+            action = 'delete_dir';
+        }
+
+        if (action) {
+            addToQueue(action, fullPath, project, globalConfig);
+        }
     });
 
     watchers.push(w);
@@ -146,41 +159,43 @@ async function stopAllWatchers() {
 
 // --- SISTEMA DE FILA (QUEUE) ---
 
-function addToQueue(fullPath, projectConfig, globalConfig) {
-    uploadQueue.push({ fullPath, projectConfig, globalConfig });
+function addToQueue(action, fullPath, projectConfig, globalConfig) {
+    taskQueue.push({ action, fullPath, projectConfig, globalConfig });
     processQueue();
 }
 
 async function processQueue() {
-    // Se já tem algo subindo, espera.
-    if (isUploading || uploadQueue.length === 0) return;
+    if (isProcessing || taskQueue.length === 0) return;
 
-    isUploading = true; // Bloqueia
-    const task = uploadQueue.shift(); // Pega o primeiro
+    isProcessing = true;
+    const task = taskQueue.shift();
 
     try {
-        await handleUpload(task.fullPath, task.projectConfig, task.globalConfig);
+        await handleSyncTask(task);
     } catch (err) {
-        console.error("Erro na fila:", err);
+        console.error("Erro na tarefa:", err);
     } finally {
-        isUploading = false; // Libera
-        
-        // Se ainda tem arquivos, processa o próximo
-        if (uploadQueue.length > 0) {
+        isProcessing = false;
+        if (taskQueue.length > 0) {
             processQueue();
         } else {
-            sendLog("🏁 Todos os arquivos foram sincronizados.", "info");
+            sendLog("🏁 Sincronização finalizada.", "info");
         }
     }
 }
 
-async function handleUpload(fullPath, projectConfig, globalConfig) {
+// --- EXECUTOR DA TAREFA ---
+
+async function handleSyncTask({ action, fullPath, projectConfig, globalConfig }) {
     const relativePath = path.relative(projectConfig.local, fullPath);
+    
+    // Caminho remoto normalizado
     const remotePath = (projectConfig.remote + "/" + relativePath)
         .split(path.sep).join(path.posix.sep)
         .replace('//', '/');
 
     try {
+        // Reconexão automática
         if (client.closed) {
             await client.access({
                 host: globalConfig.host,
@@ -191,15 +206,38 @@ async function handleUpload(fullPath, projectConfig, globalConfig) {
             });
         }
 
-        sendLog(`⬆️ [${path.basename(projectConfig.local)}] Enviando: ${relativePath}`, "info");
+        // --- DECIDE O QUE FAZER NO FTP ---
         
-        await client.ensureDir(path.dirname(remotePath));
-        await client.uploadFrom(fullPath, remotePath);
+        if (action === 'upload') {
+            sendLog(`⬆️ [${action}] ${relativePath}`, "info");
+            await client.ensureDir(path.dirname(remotePath));
+            await client.uploadFrom(fullPath, remotePath);
+            sendLog(`✅ Enviado: ${relativePath}`, "success");
+        } 
         
-        sendLog(`✅ Sucesso: ${relativePath}`, "success");
+        else if (action === 'delete_file') {
+            sendLog(`🗑️ [Deletando] ${relativePath}`, "error"); // Usei cor vermelha (error) para destacar delete
+            try {
+                await client.remove(remotePath);
+                sendLog(`💀 Removido: ${relativePath}`, "success");
+            } catch (e) {
+                // Se der erro 550 (arquivo não existe), ignora, pois já tá deletado
+                if (!e.message.includes("550")) throw e; 
+            }
+        }
+        
+        else if (action === 'delete_dir') {
+            sendLog(`📂 [Removendo Pasta] ${relativePath}`, "error");
+            try {
+                await client.removeDir(remotePath);
+                sendLog(`💀 Pasta removida: ${relativePath}`, "success");
+            } catch (e) {
+                if (!e.message.includes("550")) throw e;
+            }
+        }
 
     } catch (err) {
-        sendLog(`❌ Falha: ${err.message}`, "error");
+        sendLog(`❌ Erro (${action}): ${err.message}`, "error");
     }
 }
 
