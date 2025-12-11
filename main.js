@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const ftp = require("basic-ftp");
@@ -7,35 +7,112 @@ const chokidar = require("chokidar");
 const store = new Store();
 
 let mainWindow;
+let tray = null; // Variável da Bandeja
 let watchers = [];
 const client = new ftp.Client();
 
-// Fila agora vai guardar o "tipo" de ação também (upload ou delete)
-let taskQueue = [];      
-let isProcessing = false;   
+// Variáveis de Estado
+let uploadQueue = [];      
+let isUploading = false;   
+let isSyncing = false; // Para controlar o texto do menu (Iniciar/Parar)
+let isQuitting = false; // Para saber se é pra fechar mesmo ou só esconder
 
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1000,
         height: 750,
-        autoHideMenuBar: true, // Esconde a barra de menu
+        autoHideMenuBar: true,
+        icon: path.join(__dirname, 'icon.ico'),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
         }
     });
+    
     mainWindow.setMenuBarVisibility(false);
     mainWindow.loadFile('index.html');
+
+    // --- LÓGICA DE FECHAR (X) ---
+    mainWindow.on('close', (event) => {
+        if (!isQuitting) {
+            event.preventDefault(); // Cancela o fechamento
+            mainWindow.hide();      // Esconde a janela
+            mainWindow.setSkipTaskbar(true); // <--- FORÇA SUMIR DA BARRA DE TAREFAS
+            return false;
+        }
+    });
+
+    // --- LÓGICA DE MINIMIZAR (_) ---
+    mainWindow.on('minimize', (event) => {
+        event.preventDefault();
+        mainWindow.hide();
+        mainWindow.setSkipTaskbar(true); // <--- FORÇA SUMIR DA BARRA DE TAREFAS
+    });
+
+    // --- QUANDO MOSTRAR DE NOVO ---
+    mainWindow.on('show', () => {
+        mainWindow.setSkipTaskbar(false); // Volta a aparecer na barra de tarefas
+    });
 }
 
-app.whenReady().then(createWindow);
+// --- CRIAÇÃO DA BANDEJA (TRAY) ---
+function createTray() {
+    const iconPath = path.join(__dirname, 'icon.ico');
+    const trayIcon = nativeImage.createFromPath(iconPath);
+    
+    tray = new Tray(trayIcon);
+    tray.setToolTip('CodeSyncFtp'); // Texto ao passar o mouse
 
-// --- COMUNICAÇÃO (IPC) ---
+    tray.on('double-click', () => {
+        mainWindow.show();
+    });
 
-// 1. Salvar configurações vindas da tela
+    updateTrayMenu(); // Cria o menu inicial
+}
+
+function updateTrayMenu() {
+    if (!tray) return;
+
+    const contextMenu = Menu.buildFromTemplate([
+        { 
+            label: 'Abrir CodeSyncFtp', 
+            click: () => mainWindow.show() 
+        },
+        { type: 'separator' },
+        { 
+            label: isSyncing ? '⏹ Parar' : '▶ Iniciar', 
+            click: () => {
+                // Ao clicar no Tray, avisamos o Front para clicar no botão virtualmente
+                // Isso mantém a lógica centralizada
+                if (mainWindow) {
+                    mainWindow.webContents.send('toggle-sync-request');
+                }
+            }
+        },
+        { type: 'separator' },
+        { 
+            label: 'Sair', 
+            click: () => {
+                isQuitting = true; // Agora pode fechar
+                app.quit();
+            }
+        }
+    ]);
+
+    tray.setContextMenu(contextMenu);
+}
+
+// Inicia App
+app.whenReady().then(() => {
+    createWindow();
+    createTray();
+});
+
+// --- COMUNICAÇÃO ---
+
 ipcMain.on('save-settings', (event, data) => {
     store.set('config', data);
-    console.log('Configurações salvas!');
+    console.log('💾 Configurações salvas.');
 });
 
 // 2. Carregar configurações ao abrir
@@ -56,15 +133,14 @@ ipcMain.on('start-sync', async (event, config) => {
     sendLog("🚀 Iniciando serviço...", "info");
     await stopAllWatchers();
     
-    taskQueue = [];
-    isProcessing = false;
+    uploadQueue = [];
+    isUploading = false;
 
     if (!config.projects || config.projects.length === 0) {
         sendLog("⚠️ Nenhuma pasta configurada!", "error");
         return;
     }
 
-    // Tenta conexão FTP inicial
     try {
         await client.access({
             host: config.host,
@@ -76,6 +152,8 @@ ipcMain.on('start-sync', async (event, config) => {
         sendLog("✅ Conexão FTP estabelecida!", "success");
     } catch (err) {
         sendLog(`❌ Erro FTP: ${err.message}`, "error");
+        // Avisa o front que falhou para destravar o botão
+        event.reply('sync-error'); 
         return;
     }
 
@@ -83,21 +161,27 @@ ipcMain.on('start-sync', async (event, config) => {
         createProjectWatcher(proj, config);
     });
 
+    isSyncing = true;
+    updateTrayMenu(); // Atualiza menu do Tray para "Parar"
     sendLog(`👀 Monitorando ${config.projects.length} projetos...`, "info");
 });
 
+// --- STOP SYNC ---
 ipcMain.on('stop-sync', async () => {
     await stopAllWatchers();
     client.close();
-    taskQueue = []; 
-    isProcessing = false;
+    uploadQueue = []; 
+    isUploading = false;
+    
+    isSyncing = false;
+    updateTrayMenu(); // Atualiza menu do Tray para "Iniciar"
+    
     sendLog("🛑 Serviço parado.", "error");
 });
 
-// --- WATCHER INTELIGENTE ---
+// --- WATCHER ---
 
 function createProjectWatcher(project, globalConfig) {
-    // Prepara lista de ignorados do usuário
     const userIgnored = project.ignored 
         ? project.ignored.split(',').map(item => item.trim().toLowerCase()) 
         : [];
@@ -111,12 +195,9 @@ function createProjectWatcher(project, globalConfig) {
         awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 }
     });
 
-    // MUDANÇA: Agora escutamos 'all' e tratamos cada tipo
     w.on('all', async (event, fullPath) => {
-        // Ignora criação de pastas vazias (addDir), pois o upload de arquivo já cria a pasta.
         if (event === 'addDir') return; 
 
-        // Filtro de Ignorados
         const fileName = path.basename(fullPath).toLowerCase();
         const shouldIgnore = userIgnored.some(rule => {
             if (rule.startsWith('*')) return fileName.endsWith(rule.replace('*', ''));
@@ -124,23 +205,16 @@ function createProjectWatcher(project, globalConfig) {
         });
 
         if (shouldIgnore) {
-            // Só loga se não for exclusão (para não poluir log de coisas que já sumiram)
             if (event !== 'unlink' && event !== 'unlinkDir') {
                 sendLog(`🚫 Ignorado: ${path.basename(fullPath)}`, "info");
             }
             return;
         }
 
-        // --- DEFINE A AÇÃO ---
         let action = null;
-        
-        if (event === 'add' || event === 'change') {
-            action = 'upload';
-        } else if (event === 'unlink') {
-            action = 'delete_file';
-        } else if (event === 'unlinkDir') {
-            action = 'delete_dir';
-        }
+        if (event === 'add' || event === 'change') action = 'upload';
+        else if (event === 'unlink') action = 'delete_file';
+        else if (event === 'unlinkDir') action = 'delete_dir';
 
         if (action) {
             addToQueue(action, fullPath, project, globalConfig);
@@ -157,45 +231,42 @@ async function stopAllWatchers() {
     watchers = [];
 }
 
-// --- SISTEMA DE FILA (QUEUE) ---
+// --- QUEUE ---
 
 function addToQueue(action, fullPath, projectConfig, globalConfig) {
-    taskQueue.push({ action, fullPath, projectConfig, globalConfig });
+    uploadQueue.push({ action, fullPath, projectConfig, globalConfig });
     processQueue();
 }
 
 async function processQueue() {
-    if (isProcessing || taskQueue.length === 0) return;
+    if (isUploading || uploadQueue.length === 0) return;
 
-    isProcessing = true;
-    const task = taskQueue.shift();
+    isUploading = true;
+    const task = uploadQueue.shift();
 
     try {
         await handleSyncTask(task);
     } catch (err) {
-        console.error("Erro na tarefa:", err);
+        console.error("Erro na fila:", err);
     } finally {
-        isProcessing = false;
-        if (taskQueue.length > 0) {
+        isUploading = false;
+        if (uploadQueue.length > 0) {
             processQueue();
         } else {
-            sendLog("🏁 Sincronização finalizada.", "info");
+            sendLog("🏁 Sincronismo em dia.", "info");
         }
     }
 }
 
-// --- EXECUTOR DA TAREFA ---
+// --- EXECUTOR ---
 
 async function handleSyncTask({ action, fullPath, projectConfig, globalConfig }) {
     const relativePath = path.relative(projectConfig.local, fullPath);
-    
-    // Caminho remoto normalizado
     const remotePath = (projectConfig.remote + "/" + relativePath)
         .split(path.sep).join(path.posix.sep)
         .replace('//', '/');
 
     try {
-        // Reconexão automática
         if (client.closed) {
             await client.access({
                 host: globalConfig.host,
@@ -206,34 +277,21 @@ async function handleSyncTask({ action, fullPath, projectConfig, globalConfig })
             });
         }
 
-        // --- DECIDE O QUE FAZER NO FTP ---
-        
         if (action === 'upload') {
-            sendLog(`⬆️ [${action}] ${relativePath}`, "info");
+            sendLog(`⬆️ [Upload] ${relativePath}`, "info");
             await client.ensureDir(path.dirname(remotePath));
             await client.uploadFrom(fullPath, remotePath);
-            sendLog(`✅ Enviado: ${relativePath}`, "success");
+            sendLog(`✅ Sucesso: ${relativePath}`, "success");
         } 
-        
         else if (action === 'delete_file') {
-            sendLog(`🗑️ [Deletando] ${relativePath}`, "error"); // Usei cor vermelha (error) para destacar delete
-            try {
-                await client.remove(remotePath);
-                sendLog(`💀 Removido: ${relativePath}`, "success");
-            } catch (e) {
-                // Se der erro 550 (arquivo não existe), ignora, pois já tá deletado
-                if (!e.message.includes("550")) throw e; 
-            }
+            sendLog(`🗑️ [Del File] ${relativePath}`, "error");
+            try { await client.remove(remotePath); } catch (e) { if (!e.message.includes("550")) throw e; }
+            sendLog(`💀 Removido: ${relativePath}`, "success");
         }
-        
         else if (action === 'delete_dir') {
-            sendLog(`📂 [Removendo Pasta] ${relativePath}`, "error");
-            try {
-                await client.removeDir(remotePath);
-                sendLog(`💀 Pasta removida: ${relativePath}`, "success");
-            } catch (e) {
-                if (!e.message.includes("550")) throw e;
-            }
+            sendLog(`📂 [Del Dir] ${relativePath}`, "error");
+            try { await client.removeDir(remotePath); } catch (e) { if (!e.message.includes("550")) throw e; }
+            sendLog(`💀 Pasta removida: ${relativePath}`, "success");
         }
 
     } catch (err) {
@@ -243,11 +301,7 @@ async function handleSyncTask({ action, fullPath, projectConfig, globalConfig })
 
 function sendLog(msg, type) {
     if (mainWindow) {
-        mainWindow.webContents.send('log-msg', { 
-            msg, 
-            type, 
-            time: new Date().toLocaleTimeString() 
-        });
+        mainWindow.webContents.send('log-msg', { msg, type, time: new Date().toLocaleTimeString() });
     }
     console.log(`[${type}] ${msg}`);
 }

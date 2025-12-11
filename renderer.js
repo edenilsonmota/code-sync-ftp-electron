@@ -113,3 +113,19 @@ ipcRenderer.on('log-msg', (event, data) => {
     p.innerText = `[${data.time}] ${data.msg}`;
     logsDiv.prepend(p);
 });
+
+// Se o usuário clicar em "Iniciar/Parar" lá no menu do Relógio
+ipcRenderer.on('toggle-sync-request', () => {
+    // Verifica se o botão START está visível
+    if (btnStart.style.display !== 'none') {
+        toggleSync(true); // Inicia
+    } else {
+        toggleSync(false); // Para
+    }
+});
+
+// Se der erro de conexão no Main, destrava a tela
+ipcRenderer.on('sync-error', () => {
+    setUiRunning(false);
+    alert("Erro ao conectar no FTP. Verifique o log.");
+});
