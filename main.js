@@ -102,11 +102,28 @@ function updateTrayMenu() {
     tray.setContextMenu(contextMenu);
 }
 
-// Inicia App
-app.whenReady().then(() => {
-    createWindow();
-    createTray();
-});
+// TRAVA DE INSTÂNCIA ÚNICA
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit(); // Encerra se já houver outro rodando
+} else {
+    // Se for a instância principal, escuta tentativas de abertura
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.setSkipTaskbar(false);
+            mainWindow.focus();
+        }
+    });
+
+    // Inicia o App somente se tiver a trava
+    app.whenReady().then(() => {
+        createWindow();
+        createTray();
+    });
+}
 
 // --- COMUNICAÇÃO ---
 
