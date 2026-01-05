@@ -22,6 +22,8 @@ Acesse a aba [Releases](https://github.com/edenilsonmota/code-sync-ftp-electron/
 - **Windows:** Baixe o arquivo `CodeSyncFtp Setup 1.3.0.exe`
 - **Linux:** Baixe o arquivo `CodeSyncFtp-1.3.0.AppImage`
 
+- **Linux:** Baixe o arquivo `CodeSyncFtp-1.3.0.deb`
+
 ## 🛠️ Como Usar
 
 1. **Configuração FTP:** Preencha Host, Usuário, Senha e Porta.
