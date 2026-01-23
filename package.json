@@ -25,14 +25,20 @@
             "AppImage",
             "deb"
           ],
-          "icon": "icon.png",
-          "category": "Development"
-        },
-    "nsis": {
-      "guid": "7e3ae7d1-cf32-4207-ab8a-d3c1a097531f",
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+                  "icon": "icon.png",
+                  "category": "Development"
+                },
+              "mac": {
+                "target": [
+                  "dmg",
+                  "zip"
+                ],
+                "icon": "icon.png"
+              },
+              "nsis": {
+                "guid": "7e3ae7d1-cf32-4207-ab8a-d3c1a097531f",
+                "oneClick": false,
+                "allowToChangeInstallationDirectory": true,      "createDesktopShortcut": true,
       "shortcutName": "CodeSyncFtp"
     },
     "files": [

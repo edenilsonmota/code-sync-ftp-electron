@@ -13,16 +13,15 @@ O **CodeSyncFtp** é um aplicativo desktop leve que monitora pastas locais e faz
 - **Minimizar para a Bandeja (Novo):** O aplicativo continua rodando em segundo plano (System Tray) mesmo ao fechar a janela. Controle o status pelo ícone próximo ao relógio.
 - **Sincronização de Exclusão:** Se você deletar um arquivo ou pasta localmente, ele também será removido do servidor (Espelhamento real).
 - **Multi-Projetos:** Gerencie múltiplos mapeamentos (Local ↔ Remoto) simultaneamente com regras independentes.
-- **Cross-Platform:** Disponível para Windows e Linux.
+- **Cross-Platform:** Disponível para Windows, Linux e macOS.
 
 ## 📦 Instalação
 
 Acesse a aba [Releases](https://github.com/edenilsonmota/code-sync-ftp-electron/releases) deste repositório e baixe a última versão:
 
-- **Windows:** Baixe o arquivo `CodeSyncFtp Setup 1.3.0.exe`
-- **Linux:** Baixe o arquivo `CodeSyncFtp-1.3.0.AppImage`
-
-- **Linux:** Baixe o arquivo `CodeSyncFtp-1.3.0.deb`
+- **Windows:** Baixe o arquivo `CodeSyncFtp Setup x.x.x.exe`
+- **Linux:** Baixe o arquivo `CodeSyncFtp-x.x.x.AppImage` ou `CodeSyncFtp-x.x.x.deb`
+- **macOS:** Baixe o arquivo `CodeSyncFtp-x.x.x.dmg`
 
 ## 🛠️ Como Usar
 
@@ -40,7 +39,7 @@ Se você quiser clonar e editar o código fonte:
 
 ```bash
 # Clone o repositório
-git clone [https://github.com/edenilsonmota/code-sync-ftp-electron.git](https://github.com/edenilsonmota/code-sync-ftp-electron.git)
+git clone https://github.com/edenilsonmota/code-sync-ftp-electron.git
 
 # Entre na pasta
 cd code-sync-ftp-electron
@@ -50,3 +49,30 @@ npm install
 
 # Inicie em modo de desenvolvimento
 npm start
+```
+
+## 🏗️ Compilando o Projeto (Building)
+
+Para gerar os instaladores para as diferentes plataformas, use o comando:
+
+```bash
+# Para compilar para a plataforma atual (Windows, Linux ou macOS)
+npm run dist
+```
+Os arquivos de instalação serão criados na pasta `dist/`.
+
+Para gerar os instaladores para uma plataforma específica, você pode usar os comandos abaixo (requer ambiente compatível):
+```bash
+# Para Windows
+electron-builder --win
+
+# Para Linux
+electron-builder --linux
+
+# Para macOS (gera um build universal Intel/Apple Silicon)
+electron-builder --mac
+```
+
+## 🙏 Agradecimentos
+
+Projeto criado por [Edenilson Mota](https://github.com/edenilsonmota). Se esta ferramenta foi útil para você, considere apoiar o desenvolvedor.
