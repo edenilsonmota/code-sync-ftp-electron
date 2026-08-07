@@ -122,6 +122,10 @@ function createWindow() {
         }
     });
 
+    createdWindow.on('hide', () => {
+        console.log('[Janela] Evento hide recebido.');
+    });
+
     createdWindow.on('restore', () => {
         console.log('[Janela] Evento restore recebido.');
     });
@@ -136,6 +140,29 @@ function createWindow() {
     return createdWindow;
 }
 
+function revealMainWindow(window, source) {
+    if (!window || window.isDestroyed()) return;
+
+    if (process.platform === 'win32') {
+        window.setSkipTaskbar(false);
+    }
+
+    if (!window.isVisible()) {
+        console.log(`[Janela] Exibindo (${source}).`);
+        window.show();
+    }
+
+    if (process.platform === 'darwin') {
+        app.dock.show();
+    }
+
+    // show() já solicita foco. No Wayland, chamar focus() novamente pode ser
+    // recusado pelo compositor e resultar apenas no flash de ativação.
+    if (process.platform !== 'linux') {
+        window.focus();
+    }
+}
+
 function showMainWindow(source) {
     console.log(`[Janela] Solicitação para exibir (${source}).`);
 
@@ -145,23 +172,28 @@ function showMainWindow(source) {
 
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
-    if (process.platform === 'win32') {
-        mainWindow.setSkipTaskbar(false);
+    const window = mainWindow;
+
+    if (!window.isMinimized()) {
+        revealMainWindow(window, source);
+        return;
     }
 
-    if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-    }
+    // restore() não é síncrono em todos os gerenciadores de janela. Mostrar a
+    // janela antes da restauração terminar causa um flash e pode deixá-la oculta.
+    let didReveal = false;
+    const revealAfterRestore = () => {
+        if (didReveal) return;
+        didReveal = true;
+        revealMainWindow(window, `${source}:restore`);
+    };
 
-    if (!mainWindow.isVisible()) {
-        mainWindow.show();
-    }
+    window.once('restore', revealAfterRestore);
+    console.log(`[Janela] Restaurando antes de exibir (${source}).`);
+    window.restore();
 
-    if (process.platform === 'darwin') {
-        app.dock.show();
-    }
-
-    mainWindow.focus();
+    // Fallback para ambientes que não emitem restore ao minimizar pela shell.
+    setTimeout(revealAfterRestore, 150);
 }
 
 // --- EVENTO ACTIVATE ---
