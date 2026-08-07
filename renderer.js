@@ -17,7 +17,10 @@ const remotePickerState = {
 
 // Carregar dados salvos ao abrir
 window.onload = async () => {
-    const config = await ipcRenderer.invoke('get-settings');
+    const [config, syncIsRunning] = await Promise.all([
+        ipcRenderer.invoke('get-settings'),
+        ipcRenderer.invoke('get-sync-state')
+    ]);
     
     if(config) {
         document.getElementById('host').value = config.host || '';
@@ -34,6 +37,8 @@ window.onload = async () => {
     } else {
         addProjectRow();
     }
+
+    setSyncUiRunning(syncIsRunning);
 };
 
 // Função para adicionar linha de projeto na tela

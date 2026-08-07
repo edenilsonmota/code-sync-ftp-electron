@@ -2,7 +2,7 @@
   "name": "code-sync-ftp",
   "productName": "CodeSyncFtp",
   "desktopName": "code-sync-ftp.desktop",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Ferramenta de sincronização FTP automática",
   "author": {
     "name": "Edenilson Mota",

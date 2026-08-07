@@ -37,6 +37,7 @@ let isUploading = false;
 let isSyncing = false; // Para controlar o texto do menu (Iniciar/Parar)
 let isQuitting = false; // Para saber se é pra fechar mesmo ou só esconder
 let currentlyProcessingTaskKey = null;
+let recreateWindowOnNextShow = false;
 
 // --- EVENTO BEFORE-QUIT (Correção para CMD+Q e Dock Quit) ---
 app.on('before-quit', () => {
@@ -62,7 +63,23 @@ function hideMainWindow(source) {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
     console.log(`[Janela] Ocultando (${source}).`);
-    mainWindow.hide();
+
+    const window = mainWindow;
+    window.hide();
+
+    // No GNOME/Wayland com Electron 28, uma BrowserWindow escondida pode não
+    // voltar a ser mapeada, embora show() seja chamado. Recriá-la evita esse
+    // estado preso sem encerrar o processo que mantém FTP e Tray ativos.
+    if (process.platform === 'linux') {
+        recreateWindowOnNextShow = true;
+        setImmediate(() => {
+            if (!window.isDestroyed()) {
+                console.log('[Janela] Destruindo janela oculta para recriação no Linux.');
+                window.destroy();
+            }
+        });
+        return;
+    }
 
     // setSkipTaskbar não é suportado no Linux; hide() já remove a janela da
     // visualização e o desktopName mantém a associação com o launcher.
@@ -165,6 +182,20 @@ function revealMainWindow(window, source) {
 
 function showMainWindow(source) {
     console.log(`[Janela] Solicitação para exibir (${source}).`);
+
+    if (process.platform === 'linux' && recreateWindowOnNextShow) {
+        const hiddenWindow = mainWindow;
+        recreateWindowOnNextShow = false;
+
+        if (hiddenWindow && !hiddenWindow.isDestroyed()) {
+            console.log('[Janela] Descartando janela oculta antes de recriar.');
+            hiddenWindow.destroy();
+        }
+
+        if (mainWindow === hiddenWindow) {
+            mainWindow = null;
+        }
+    }
 
     if (!mainWindow || mainWindow.isDestroyed()) {
         createWindow();
@@ -288,6 +319,8 @@ ipcMain.on('save-settings', (event, data) => {
 ipcMain.handle('get-settings', () => {
     return store.get('config', { projects: [] });
 });
+
+ipcMain.handle('get-sync-state', () => isSyncing);
 
 ipcMain.handle('test-ftp-credentials', async (event, config) => {
     const testClient = new ftp.Client();
