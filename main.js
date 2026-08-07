@@ -4,6 +4,26 @@ const Store = require('electron-store');
 const ftp = require("basic-ftp");
 const chokidar = require("chokidar");
 
+const APP_NAME = 'CodeSyncFtp';
+const APP_ID = 'com.edenilson.codesyncftp';
+const LINUX_DESKTOP_NAME = 'code-sync-ftp.desktop';
+
+app.setName(APP_NAME);
+
+// A identidade precisa ser definida antes de `ready` para o GNOME associar a
+// janela ao arquivo .desktop instalado pelo pacote.
+if (process.platform === 'linux' && typeof app.setDesktopName === 'function') {
+    app.setDesktopName(LINUX_DESKTOP_NAME);
+} else if (process.platform === 'win32') {
+    app.setAppUserModelId(APP_ID);
+}
+
+if (process.platform === 'linux') {
+    // Electron 28 ainda não expõe setDesktopName; o switch mantém WM_CLASS e
+    // o app_id do Wayland alinhados ao code-sync-ftp.desktop.
+    app.commandLine.appendSwitch('class', 'code-sync-ftp');
+}
+
 const store = new Store();
 
 let mainWindow;
@@ -23,76 +43,151 @@ app.on('before-quit', () => {
     isQuitting = true;
 });
 
+app.on('window-all-closed', () => {
+    if (!isQuitting) {
+        console.log('[App] Sem janelas; processo mantido ativo pelo Tray.');
+    }
+});
+
+function getRuntimeAssetPath(fileName) {
+    const basePath = app.isPackaged ? process.resourcesPath : __dirname;
+    return path.join(basePath, fileName);
+}
+
+function getWindowIconPath() {
+    return getRuntimeAssetPath(process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+}
+
+function hideMainWindow(source) {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    console.log(`[Janela] Ocultando (${source}).`);
+    mainWindow.hide();
+
+    // setSkipTaskbar não é suportado no Linux; hide() já remove a janela da
+    // visualização e o desktopName mantém a associação com o launcher.
+    if (process.platform === 'win32') {
+        mainWindow.setSkipTaskbar(true);
+    }
+}
+
 function createWindow() {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        return mainWindow;
+    }
+
+    const windowIconPath = getWindowIconPath();
+    console.log(`[Janela] Criando com ícone: ${windowIconPath}`);
+
     mainWindow = new BrowserWindow({
         width: 1000,
         height: 750,
         autoHideMenuBar: true,
-        icon: path.join(__dirname, 'icon.ico'),
+        icon: windowIconPath,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
         }
     });
 
-    mainWindow.setMenuBarVisibility(false);
-    mainWindow.loadFile('index.html');
+    const createdWindow = mainWindow;
+
+    createdWindow.setMenuBarVisibility(false);
+    createdWindow.loadFile('index.html');
 
     // --- LÓGICA DE FECHAR (X) ---
-    mainWindow.on('close', (event) => {
+    createdWindow.on('close', (event) => {
         if (!isQuitting) {
-            event.preventDefault(); // Cancela o fechamento
-            mainWindow.hide();      // Esconde a janela
-            // No macOS, não queremos sumir da Dock ao fechar a janela, pois é comportamento padrão manter o app rodando.
-            if (process.platform !== 'darwin') {
-                mainWindow.setSkipTaskbar(true); // <--- FORÇA SUMIR DA BARRA DE TAREFAS (Windows/Linux)
-            }
+            event.preventDefault();
+            hideMainWindow('close');
             return false;
         }
     });
 
     // --- LÓGICA DE MINIMIZAR (_) ---
-    mainWindow.on('minimize', (event) => {
+    createdWindow.on('minimize', (event) => {
+        console.log('[Janela] Evento minimize recebido.');
         event.preventDefault();
-        mainWindow.hide();
-        if (process.platform !== 'darwin') {
-            mainWindow.setSkipTaskbar(true);
-        }
+        hideMainWindow('minimize');
     });
 
     // --- QUANDO MOSTRAR DE NOVO ---
-    mainWindow.on('show', () => {
-        mainWindow.setSkipTaskbar(false); // Volta a aparecer na barra de tarefas
+    createdWindow.on('show', () => {
+        console.log('[Janela] Evento show recebido.');
+        if (process.platform === 'win32') {
+            createdWindow.setSkipTaskbar(false);
+        }
         if (process.platform === 'darwin') {
             app.dock.show();
         }
     });
+
+    createdWindow.on('restore', () => {
+        console.log('[Janela] Evento restore recebido.');
+    });
+
+    createdWindow.on('closed', () => {
+        console.log('[Janela] Janela destruída.');
+        if (mainWindow === createdWindow) {
+            mainWindow = null;
+        }
+    });
+
+    return createdWindow;
 }
 
-// --- EVENTO ACTIVATE (Importante para macOS) ---
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+function showMainWindow(source) {
+    console.log(`[Janela] Solicitação para exibir (${source}).`);
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
         createWindow();
-    } else {
-        if (mainWindow) {
-            mainWindow.show();
-            if (process.platform === 'darwin') {
-                app.dock.show();
-            }
-        }
     }
+
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    if (process.platform === 'win32') {
+        mainWindow.setSkipTaskbar(false);
+    }
+
+    if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+    }
+
+    if (!mainWindow.isVisible()) {
+        mainWindow.show();
+    }
+
+    if (process.platform === 'darwin') {
+        app.dock.show();
+    }
+
+    mainWindow.focus();
+}
+
+// --- EVENTO ACTIVATE ---
+app.on('activate', () => {
+    console.log('[App] Evento activate recebido.');
+    showMainWindow('activate');
 });
 
 // --- CRIAÇÃO DA BANDEJA (TRAY) ---
 function createTray() {
-    const iconPath = path.join(__dirname, 'icon.ico');
+    const trayIconName = process.platform === 'win32' ? 'icon.ico' : 'tray-icon.png';
+    const iconPath = getRuntimeAssetPath(trayIconName);
     const trayIcon = nativeImage.createFromPath(iconPath);
 
-    tray = new Tray(trayIcon);
-    tray.setToolTip('CodeSyncFtp'); // Texto ao passar o mouse
+    if (trayIcon.isEmpty()) {
+        console.error(`[Tray] Não foi possível carregar o ícone: ${iconPath}`);
+        return;
+    }
 
-    tray.on('double-click', () => {
-        mainWindow.show();
+    tray = new Tray(trayIcon);
+    tray.setToolTip(APP_NAME);
+    console.log(`[Tray] Criado com ícone: ${iconPath}`);
+
+    tray.on('click', () => {
+        console.log('[Tray] Clique recebido.');
+        showMainWindow('tray-click');
     });
 
     updateTrayMenu(); // Cria o menu inicial
@@ -104,7 +199,7 @@ function updateTrayMenu() {
     const contextMenu = Menu.buildFromTemplate([
         {
             label: 'Abrir CodeSyncFtp',
-            click: () => mainWindow.show()
+            click: () => showMainWindow('tray-menu')
         },
         { type: 'separator' },
         {
@@ -138,19 +233,13 @@ if (!gotTheLock) {
 } else {
     // Se for a instância principal, escuta tentativas de abertura
     app.on('second-instance', () => {
-        if (mainWindow) {
-            if (mainWindow.isMinimized()) mainWindow.restore();
-            mainWindow.show();
-            mainWindow.setSkipTaskbar(false);
-            if (process.platform === 'darwin') {
-                app.dock.show();
-            }
-            mainWindow.focus();
-        }
+        console.log('[App] Segunda instância detectada.');
+        showMainWindow('second-instance');
     });
 
     // Inicia o App somente se tiver a trava
     app.whenReady().then(() => {
+        console.log(`[App] Pronto (${process.platform}, packaged=${app.isPackaged}).`);
         createWindow();
         createTray();
     });

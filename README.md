@@ -43,6 +43,16 @@ Este projeto usa Docker como forma principal de execução e build para Linux, m
 - Docker Compose (`docker compose`)
 - Linux desktop com servidor gráfico compatível (Wayland e derivados)
 
+### Ícone de bandeja no GNOME
+
+O Electron publica o ícone de bandeja no Linux pelo protocolo StatusNotifierItem. O GNOME Shell precisa de uma extensão que exiba esses indicadores. Em instalações Ubuntu nas quais ela não esteja presente ou habilitada, instale o suporte a AppIndicator:
+
+```bash
+sudo apt install gnome-shell-extension-appindicator
+```
+
+Depois, habilite a extensão **AppIndicator and KStatusNotifierItem Support** (ou **Status Icons**, no GNOME 50) e encerre/inicie novamente a sessão. Essa extensão é uma integração do ambiente gráfico; o pacote do CodeSyncFtp não deve ativá-la automaticamente no perfil do usuário.
+
 ### 1) Clonar o projeto
 
 ```bash

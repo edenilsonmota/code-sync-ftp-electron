@@ -1,10 +1,12 @@
 {
   "name": "code-sync-ftp",
-  "version": "1.5.1",
+  "productName": "CodeSyncFtp",
+  "desktopName": "code-sync-ftp.desktop",
+  "version": "1.7.0",
   "description": "Ferramenta de sincronização FTP automática",
   "author": {
     "name": "Edenilson Mota",
-    "email": "edenilsonmota@gmail.com"
+    "email": "edenilsonmota.job@gmail.com"
   },
   "main": "main.js",
   "scripts": {
@@ -14,6 +16,7 @@
   "build": {
     "appId": "com.edenilson.codesyncftp",
     "productName": "CodeSyncFtp",
+    "executableName": "code-sync-ftp",
     "win": {
       "target": [
         "nsis"
@@ -26,8 +29,12 @@
         "deb",
         "pacman"
       ],
-      "icon": "icon.png",
-      "category": "Development"
+      "icon": "build/icons",
+      "category": "Development",
+      "desktop": {
+        "Name": "CodeSyncFtp",
+        "StartupWMClass": "code-sync-ftp"
+      }
     },
     "pacman": {
       "artifactName": "${name}-${version}-${arch}.pkg.tar.zst",
@@ -61,6 +68,20 @@
       "!*.map",
       "!**/*.md",
       "!dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "icon.png",
+        "to": "icon.png"
+      },
+      {
+        "from": "icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "tray-icon.png",
+        "to": "tray-icon.png"
+      }
     ]
   },
   "dependencies": {
