@@ -3,6 +3,9 @@ const path = require('path');
 const Store = require('electron-store');
 const ftp = require("basic-ftp");
 const chokidar = require("chokidar");
+const fs = require('fs');
+const gracefulFs = require('graceful-fs');
+gracefulFs.gracefulify(fs);
 
 const APP_NAME = 'CodeSyncFtp';
 const APP_ID = 'com.edenilson.codesyncftp';
@@ -461,10 +464,38 @@ function createProjectWatcher(project, globalConfig) {
         ? project.ignored.split(',').map(item => item.trim().toLowerCase())
         : [];
 
-    const systemIgnored = [/node_modules/, /\.git/, /\.vscode/, /desktop\.ini/];
+    const systemIgnored = [
+        /node_modules/,
+        /\.git/,
+        /\.vscode/,
+        /\.idea/,
+        /\.cursor/,
+        /\.venv.*/,
+        /\.DS_Store/,
+        /desktop\.ini/,
+        /vendor/
+    ];
 
     const w = chokidar.watch(project.local, {
-        ignored: systemIgnored,
+        ignored: (filePath) => {
+            const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
+            
+            // 1. Check system ignored patterns
+            const isSystemIgnored = systemIgnored.some(regex => regex.test(normalizedPath));
+            if (isSystemIgnored) return true;
+
+            // 2. Check user ignored patterns
+            const fileName = path.basename(filePath).toLowerCase();
+            const isUserIgnored = userIgnored.some(rule => {
+                if (!rule) return false;
+                if (rule.startsWith('*')) return fileName.endsWith(rule.replace('*', ''));
+                
+                // Match exact directory segment or filename
+                const parts = normalizedPath.split('/');
+                return parts.includes(rule) || fileName === rule;
+            });
+            return isUserIgnored;
+        },
         persistent: true,
         ignoreInitial: true,
         usePolling: false,
@@ -473,19 +504,6 @@ function createProjectWatcher(project, globalConfig) {
 
     w.on('all', async (event, fullPath) => {
         if (event === 'addDir') return;
-
-        const fileName = path.basename(fullPath).toLowerCase();
-        const shouldIgnore = userIgnored.some(rule => {
-            if (rule.startsWith('*')) return fileName.endsWith(rule.replace('*', ''));
-            return fileName === rule;
-        });
-
-        if (shouldIgnore) {
-            if (event !== 'unlink' && event !== 'unlinkDir') {
-                sendLog(`Ignorado: ${path.basename(fullPath)}`, "info");
-            }
-            return;
-        }
 
         let action = null;
         if (event === 'add' || event === 'change') action = 'upload';

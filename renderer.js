@@ -30,7 +30,7 @@ window.onload = async () => {
         
         // Recriar linhas dos projetos
         if(config.projects && config.projects.length > 0) {
-            config.projects.forEach(p => addProjectRow(p.local, p.remote));
+            config.projects.forEach(p => addProjectRow(p.local, p.remote, p.ignored || ''));
         } else {
             addProjectRow(); // Adiciona uma linha vazia padrão
         }
@@ -42,7 +42,7 @@ window.onload = async () => {
 };
 
 // Função para adicionar linha de projeto na tela
-function addProjectRow(localVal = '', remoteVal = '') {
+function addProjectRow(localVal = '', remoteVal = '', ignoredVal = '') {
     const div = document.createElement('div');
     div.className = 'project-row';
     div.innerHTML = `
@@ -53,6 +53,9 @@ function addProjectRow(localVal = '', remoteVal = '') {
         <div class="remote-field">
             <input type="text" value="${remoteVal}" placeholder="Pasta Remota (/web/...)" class="input-remote">
             <button class="btn-remote-folder" onclick="openRemotePicker(this)">Escolher FTP</button>
+        </div>
+        <div>
+            <input type="text" value="${ignoredVal}" placeholder="Ignorar (ex: classes, vendor, *.zip)" class="input-ignored">
         </div>
         <button class="btn-remove" onclick="removeRow(this)">Remover</button>
     `;
@@ -219,8 +222,9 @@ function toggleSync(start) {
         rows.forEach(row => {
             const local = row.querySelector('.input-local').value;
             const remote = row.querySelector('.input-remote').value;
+            const ignored = row.querySelector('.input-ignored').value;
             if(local && remote) {
-                config.projects.push({ local, remote });
+                config.projects.push({ local, remote, ignored });
             }
         });
 
