@@ -44,10 +44,12 @@ jpackage \
   --name FTPFileSynchronizer \
   --linux-package-name ftp-file-synchronizer \
   --linux-shortcut \
-  --app-version 1.0.0 \
+  --app-version 1.0.2 \
   --vendor "Edenilson Mota" \
   --description "Sincronizador de arquivos locais com FTP" \
-  --icon packaging/linux/ftp-file-synchronizer.png
+  --icon packaging/linux/ftp-file-synchronizer.png \
+  --resource-dir packaging/linux \
+  --java-options "-Dsun.awt.X11.XToolkit.awtAppClassName=FTPFileSynchronizer"
 ```
 
 Esse comando já foi testado e gera o arquivo RPM dentro de `dist/linux`.
@@ -85,7 +87,7 @@ jpackage `
   --main-jar ftp-file-synchronizer.jar `
   --main-class com.edenilson.ftpsync.app.Main `
   --name FTPFileSynchronizer `
-  --app-version 1.0.0 `
+  --app-version 1.0.2 `
   --vendor "Edenilson Mota" `
   --icon packaging\windows\ftp-file-synchronizer.ico `
   --win-menu `
@@ -123,7 +125,7 @@ jpackage \
   --name FTPFileSynchronizer \
   --mac-package-name "FTP File Synchronizer" \
   --mac-package-identifier com.edenilson.ftpsync \
-  --app-version 1.0.0 \
+  --app-version 1.0.2 \
   --vendor "Edenilson Mota" \
   --icon packaging/macos/ftp-file-synchronizer.icns
 ```

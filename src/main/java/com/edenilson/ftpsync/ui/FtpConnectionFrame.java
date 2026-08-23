@@ -45,11 +45,12 @@ public final class FtpConnectionFrame extends JFrame {
             new SettingsRepository(new SecureCredentialStore());
     private AppearanceSettings appearance = AppearanceSettings.DEFAULT;
     private SynchronizationService synchronizationService;
+    private ApplicationTray applicationTray;
 
     public FtpConnectionFrame() {
         super("FTP File Synchronizer");
         setIconImages(ApplicationIcons.loadWindowIcons());
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         setMinimumSize(new Dimension(850, 650));
         setSize(950, 760);
         createContent();
@@ -57,14 +58,44 @@ public final class FtpConnectionFrame extends JFrame {
             addMappingRow();
         }
         connectEvents();
+        applicationTray = ApplicationTray.create(this::showFromTray, this::exitApplication);
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent event) {
-                saveSettings();
-                stopSynchronization();
+                handleWindowClosing();
             }
         });
         setLocationRelativeTo(null);
+    }
+
+    private void handleWindowClosing() {
+        saveSettings();
+        if (applicationTray == null) {
+            exitApplication();
+            return;
+        }
+        setVisible(false);
+        applicationTray.notifyHidden();
+    }
+
+    private void showFromTray() {
+        if (!isVisible()) {
+            setVisible(true);
+        }
+        setExtendedState(JFrame.NORMAL);
+        toFront();
+        requestFocus();
+    }
+
+    private void exitApplication() {
+        saveSettings();
+        stopSynchronization();
+        if (applicationTray != null) {
+            applicationTray.close();
+            applicationTray = null;
+        }
+        dispose();
+        System.exit(0);
     }
 
     private void createContent() {
