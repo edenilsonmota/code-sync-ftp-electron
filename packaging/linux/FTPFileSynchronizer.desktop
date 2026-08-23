@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=FTP File Synchronizer
+Comment=Sincronizador de arquivos locais com FTP
+Exec=/opt/ftp-file-synchronizer/bin/FTPFileSynchronizer
+Icon=/opt/ftp-file-synchronizer/lib/FTPFileSynchronizer.png
+Terminal=false
+Type=Application
+Categories=Development;
+StartupNotify=true
+StartupWMClass=FTPFileSynchronizer
