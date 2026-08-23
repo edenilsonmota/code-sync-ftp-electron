@@ -1,15 +1,56 @@
-# ftp-file-synchronizer
+# FTP File Synchronizer
 
+Aplicativo desktop para acompanhar alterações em pastas locais e enviá-las
+automaticamente para um servidor FTP.
 
-O **ftp-file-synchronizer** é um aplicativo desktop leve que monitora pastas locais e faz upload automático de arquivos alterados para um servidor FTP. Foi criado para desenvolvedores que desejam manter seus arquivos sincronizados com um servidor remoto sem depender de plugins de IDEs ou editores específicos.
-## Funcionalidades
+![Tela do FTP File Synchronizer](assets/img.png)
 
-- **Monitoramento em Tempo Real:** Criou, atualizou ou excluiu um arquivo? A alteração é refletida no servidor instantaneamente.
-- **Sincronização de Exclusão:** Se você deletar um arquivo ou pasta localmente, ele também será removido do servidor (Espelhamento real).
-- **Multi-Projetos:** Gerencie múltiplos mapeamentos (Local ↔ Remoto) simultaneamente com regras independentes.
-- **Cross-Platform:** Disponível para Windows, Linux e macOS.
+Criei este projeto para substituir o sincronizador que eu usava no Electron por
+uma aplicação Java mais leve e independente de editor ou IDE.
 
+## O que já funciona
 
-## 🙏 Agradecimentos
+- conexão com servidor FTP;
+- vários projetos locais apontando para caminhos FTP diferentes;
+- envio de arquivos criados ou alterados enquanto o monitoramento está ativo;
+- exclusão remota quando um arquivo local é removido;
+- fila de upload com envio de um arquivo por vez;
+- agrupamento de alterações rápidas no mesmo arquivo;
+- escolha entre tema claro e escuro e ajuste do tamanho da fonte;
+- armazenamento das configurações e proteção da senha pelo cofre do sistema.
+
+O programa não envia o projeto inteiro quando o monitoramento começa. Ele cuida
+somente das alterações que acontecerem depois de clicar em **Sincronizar**.
+
+## Rodando pelo código-fonte
+
+Você precisa do JDK 25. O Maven já é baixado pelo wrapper do projeto.
+
+Linux ou macOS:
+
+```bash
+./mvnw clean package
+java -cp "target/jpackage-input/*" com.edenilson.ftpsync.app.Main
+```
+
+Windows:
+
+```powershell
+.\mvnw.cmd clean package
+java -cp "target\jpackage-input\*" com.edenilson.ftpsync.app.Main
+```
+
+Também é possível executar a classe `com.edenilson.ftpsync.app.Main` diretamente
+pelo IDEA.
+
+## Gerando instaladores
+
+Os comandos de empacotamento para Linux, Windows e macOS estão no
+[BUILD.md](BUILD.md).
+
+## Observação
+
+O FTP comum não criptografa a conexão. Por enquanto este projeto deve ser usado
+somente com servidores e redes confiáveis.
 
 Projeto criado por [Edenilson Mota](https://github.com/edenilsonmota).

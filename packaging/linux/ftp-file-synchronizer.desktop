@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FTP File Synchronizer
+Comment=Sincroniza alterações locais com um servidor FTP
+Exec=FTPFileSynchronizer
+Icon=ftp-file-synchronizer
+Terminal=false
+Categories=Development;Utility;
