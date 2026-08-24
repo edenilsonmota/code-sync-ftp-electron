@@ -44,7 +44,7 @@ jpackage \
   --name FTPFileSynchronizer \
   --linux-package-name ftp-file-synchronizer \
   --linux-shortcut \
-  --app-version 1.0.2 \
+  --app-version 1.0.3 \
   --vendor "Edenilson Mota" \
   --description "Sincronizador de arquivos locais com FTP" \
   --icon packaging/linux/ftp-file-synchronizer.png \
@@ -87,7 +87,7 @@ jpackage `
   --main-jar ftp-file-synchronizer.jar `
   --main-class com.edenilson.ftpsync.app.Main `
   --name FTPFileSynchronizer `
-  --app-version 1.0.2 `
+  --app-version 1.0.3 `
   --vendor "Edenilson Mota" `
   --icon packaging\windows\ftp-file-synchronizer.ico `
   --win-menu `
@@ -125,7 +125,7 @@ jpackage \
   --name FTPFileSynchronizer \
   --mac-package-name "FTP File Synchronizer" \
   --mac-package-identifier com.edenilson.ftpsync \
-  --app-version 1.0.2 \
+  --app-version 1.0.3 \
   --vendor "Edenilson Mota" \
   --icon packaging/macos/ftp-file-synchronizer.icns
 ```

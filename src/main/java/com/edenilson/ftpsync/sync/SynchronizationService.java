@@ -131,6 +131,10 @@ public final class SynchronizationService implements AutoCloseable {
                     }
 
                     Path changed = watched.directory().resolve((Path) event.context()).normalize();
+                    if (isIgnored(watched.mapping(), changed)) {
+                        cancelScheduledUploads(changed);
+                        continue;
+                    }
                     if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                         cancelScheduledUploads(changed);
                         boolean directory = Boolean.TRUE.equals(knownPaths.remove(changed));
@@ -166,6 +170,9 @@ public final class SynchronizationService implements AutoCloseable {
             @Override
             public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
                     throws IOException {
+                if (isIgnored(mapping, directory)) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
                 WatchKey key = directory.register(
                         watchService,
                         StandardWatchEventKinds.ENTRY_CREATE,
@@ -179,7 +186,7 @@ public final class SynchronizationService implements AutoCloseable {
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                if (attributes.isRegularFile()) {
+                if (attributes.isRegularFile() && !isIgnored(mapping, file)) {
                     knownPaths.put(file, false);
                     if (uploadExistingFiles) {
                         scheduleUpload(mapping, file);
@@ -196,6 +203,9 @@ public final class SynchronizationService implements AutoCloseable {
 
     private void scheduleUpload(SyncMapping mapping, Path file) {
         Path normalized = file.toAbsolutePath().normalize();
+        if (isIgnored(mapping, normalized)) {
+            return;
+        }
         long version = nextUploadVersion.incrementAndGet();
         uploadVersions.put(normalized, version);
 
@@ -236,6 +246,9 @@ public final class SynchronizationService implements AutoCloseable {
     }
 
     private void process(SyncTask task) {
+        if (isIgnored(task.mapping(), task.localPath())) {
+            return;
+        }
         try {
             if (task.operation() == SyncTask.Operation.UPLOAD) {
                 if (!Files.isRegularFile(task.localPath())) {
@@ -273,6 +286,20 @@ public final class SynchronizationService implements AutoCloseable {
     private String safeMessage(Throwable throwable) {
         return throwable.getMessage() == null || throwable.getMessage().isBlank()
                 ? throwable.getClass().getSimpleName() : throwable.getMessage();
+    }
+
+    private boolean isIgnored(SyncMapping mapping, Path path) {
+        Path normalized = path.toAbsolutePath().normalize();
+        if (!normalized.startsWith(mapping.localRoot())) {
+            return true;
+        }
+        Path relative = mapping.localRoot().relativize(normalized);
+        for (Path part : relative) {
+            if (".git".equals(part.toString())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private record WatchedDirectory(SyncMapping mapping, Path directory) {
