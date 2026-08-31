@@ -13,11 +13,11 @@ Guidance for AI coding agents working in this repository.
 
 ## Run And Build
 
-- Use Docker Compose as the standard workflow for Linux, macOS, and WSL.
-- Start development GUI app on Linux desktop sessions: `docker compose --profile dev up --build app-dev`
-- Build Linux installer(s) including Arch package output: `docker compose --profile build run --rm app-build`
-- For Windows run/build, use local npm workflow (`npm install`, `npm start`, `npm run dist -- --win`).
-- Optional cleanup: `docker compose down -v`
+- Use the local Node.js/npm workflow on Windows, Linux, and macOS.
+- Install dependencies with `npm install` (or `npm ci` for a clean, reproducible install).
+- Start the development app with `npm start`.
+- Run automated validation with `npm run check` and `npm test`.
+- Build for the current platform with `npm run dist` or select a target with `npm run dist -- --win`, `--linux`, or `--mac`.
 
 ## Architecture Boundaries
 
@@ -48,8 +48,7 @@ Guidance for AI coding agents working in this repository.
 ## Validation
 
 - Run `npm run check` and `npm test` for static and automated validation.
-- After code changes, validate by running the app via compose (`docker compose --profile dev up --build app-dev`) and manually checking:
+- After code changes, validate by running the app with `npm start` and manually checking:
   - start/stop sync flow
   - tray actions (open/start-stop/exit)
   - log updates in renderer
-- Ensure the Linux host graphical session permissions allow containerized GUI apps.
