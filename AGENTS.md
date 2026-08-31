@@ -6,7 +6,9 @@ Guidance for AI coding agents working in this repository.
 
 - Desktop Electron app that syncs local file changes to FTP.
 - Main entrypoint: `main.js`.
-- UI layer: `index.html` + `renderer.js`.
+- Application composition: `src/main/application.js`.
+- Preload bridge: `src/preload.js`.
+- UI layer: `src/renderer/index.html` + `src/renderer/renderer.js`.
 - Primary documentation: [README.md](README.md).
 
 ## Run And Build
@@ -19,12 +21,11 @@ Guidance for AI coding agents working in this repository.
 
 ## Architecture Boundaries
 
-- Keep Electron main-process logic in `main.js`:
-  - app lifecycle, tray, window behavior
-  - FTP connection and sync queue
-  - filesystem watchers (`chokidar`)
-  - IPC handlers (`ipcMain`)
-- Keep renderer/UI logic in `renderer.js` and markup/styles in `index.html`.
+- Keep `main.js` as a minimal bootstrap.
+- Keep application composition and lifecycle in `src/main/application.js`.
+- Keep FTP operations in `src/main/ftp`, sync/watchers in `src/main/sync`, IPC registration in `src/main/ipc`, and window/tray behavior in `src/main/ui`.
+- Keep the narrow, allow-listed IPC bridge in `src/preload.js`.
+- Keep renderer/UI logic in `src/renderer/renderer.js` and markup/styles in `src/renderer/index.html`.
 - Communicate between layers via existing IPC channels; prefer extending current channels over introducing parallel patterns.
 
 ## Existing Conventions
@@ -39,14 +40,14 @@ Guidance for AI coding agents working in this repository.
 
 ## Pitfalls And Safety Notes
 
-- This app currently uses `nodeIntegration: true` and `contextIsolation: false`; do not refactor this security model unless explicitly requested.
+- Preserve `nodeIntegration: false`, `contextIsolation: true`, the sandbox, and the renderer Content Security Policy.
 - Preserve single-instance behavior (`app.requestSingleInstanceLock()`).
 - Preserve close/minimize-to-tray behavior when editing window lifecycle code.
 - Always ensure watcher cleanup on stop/restart (`stopAllWatchers()`) to avoid duplicate watchers.
 
 ## Validation
 
-- There are no test or lint scripts in `package.json`.
+- Run `npm run check` and `npm test` for static and automated validation.
 - After code changes, validate by running the app via compose (`docker compose --profile dev up --build app-dev`) and manually checking:
   - start/stop sync flow
   - tray actions (open/start-stop/exit)

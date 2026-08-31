@@ -1,11 +1,26 @@
-# 🚀 CodeSyncFtp
+# 🚀 FTP File Synchronizer
 
 > Ferramenta de sincronização FTP automática, agnóstica a editor.
-> **Versão Atual:** 1.3.0
+> **Versão Atual:** 1.7.1
 
-O **CodeSyncFtp** é um aplicativo desktop leve que monitora pastas locais e faz upload automático de arquivos alterados para um servidor FTP. Foi criado para suprir a falta de sincronização robusta em editores como **Zed** e **Cursor**, mas funciona perfeitamente com **VS Code**, **Sublime Text**, **Notepad++** ou qualquer outro editor.
+O **FTP File Synchronizer** é um aplicativo desktop leve que monitora pastas locais e faz upload automático de arquivos alterados para um servidor FTP. Foi criado para suprir a falta de sincronização robusta em editores como **Zed** e **Cursor**, mas funciona perfeitamente com **VS Code**, **Sublime Text**, **Notepad++** ou qualquer outro editor.
 
-<img src="Screenshot.png" alt="Screenshot do CodeSyncFtp" width="100%"/>
+<img src="Screenshot.png" alt="Screenshot do FTP File Synchronizer" width="100%"/>
+
+## Arquitetura
+
+O arquivo `main.js` é apenas o ponto de entrada. Os componentes do processo principal ficam separados em `src/main`:
+
+- `application.js`: composição dos serviços e ciclo de vida do Electron;
+- `config/`: identidade e caminhos da aplicação;
+- `ftp/`: operações e conexões FTP;
+- `sync/`: watchers, fila e execução da sincronização;
+- `ipc/`: canais entre o processo principal e a interface;
+- `ui/`: gerenciamento da janela e da bandeja.
+
+A interface fica reunida em `src/renderer` e acessa somente a API permitida por `src/preload.js`.
+
+As credenciais são protegidas pelo armazenamento seguro do sistema operacional quando disponível. Configurações da identidade antiga `CodeSyncFtp` são migradas automaticamente no primeiro uso.
 
 ## ✨ Funcionalidades
 
@@ -13,15 +28,17 @@ O **CodeSyncFtp** é um aplicativo desktop leve que monitora pastas locais e faz
 - **Minimizar para a Bandeja (Novo):** O aplicativo continua rodando em segundo plano (System Tray) mesmo ao fechar a janela. Controle o status pelo ícone próximo ao relógio.
 - **Sincronização de Exclusão:** Se você deletar um arquivo ou pasta localmente, ele também será removido do servidor (Espelhamento real).
 - **Multi-Projetos:** Gerencie múltiplos mapeamentos (Local ↔ Remoto) simultaneamente com regras independentes.
+- **Sincronização inicial:** Ao iniciar, os arquivos existentes também entram na fila de envio.
+- **Arquivos ignorados:** Cada projeto aceita nomes ou extensões separados por vírgula, como `.env, *.log`.
 - **Cross-Platform:** Disponível para Windows, Linux e macOS.
 
 ## 📦 Instalação
 
-Acesse a aba [Releases](https://github.com/edenilsonmota/code-sync-ftp-electron/releases) deste repositório e baixe a última versão:
+Acesse a aba [Releases](https://github.com/edenilsonmota/ftp-file-synchronizer/releases) deste repositório e baixe a última versão:
 
-- **Windows:** Baixe o arquivo `CodeSyncFtp Setup x.x.x.exe`
-- **Linux:** Baixe o arquivo `CodeSyncFtp-x.x.x.AppImage` ou `CodeSyncFtp-x.x.x.deb`
-- **macOS:** Baixe o arquivo `CodeSyncFtp-x.x.x.dmg`
+- **Windows:** Baixe o arquivo `FTP File Synchronizer Setup x.x.x.exe`
+- **Linux:** Baixe o arquivo `FTP File Synchronizer-x.x.x.AppImage` ou `ftp-file-synchronizer_x.x.x_amd64.deb`
+- **macOS:** Baixe o arquivo `FTP File Synchronizer-x.x.x.dmg`
 
 ## 🛠️ Como Usar
 
@@ -30,7 +47,7 @@ Acesse a aba [Releases](https://github.com/edenilsonmota/code-sync-ftp-electron/
    - Selecione a **Pasta Local** no seu computador.
    - Digite o caminho da **Pasta Remota** no servidor (ex: `/public_html/site`).
 3. **Iniciar:** Clique em **▶ INICIAR**.
-4. **Trabalhar:** Abra seu editor favorito e comece a codar. O CodeSyncFtp fará o resto.
+4. **Trabalhar:** Abra seu editor favorito e comece a codar. O FTP File Synchronizer fará o resto.
    > **Nota:** Ao clicar no "X" para fechar, o app será minimizado para a bandeja. Para sair totalmente, clique com o botão direito no ícone do relógio e escolha "Sair".
 
 ## 🐳 Desenvolvimento e Build (Docker Compose)
@@ -51,13 +68,13 @@ O Electron publica o ícone de bandeja no Linux pelo protocolo StatusNotifierIte
 sudo apt install gnome-shell-extension-appindicator
 ```
 
-Depois, habilite a extensão **AppIndicator and KStatusNotifierItem Support** (ou **Status Icons**, no GNOME 50) e encerre/inicie novamente a sessão. Essa extensão é uma integração do ambiente gráfico; o pacote do CodeSyncFtp não deve ativá-la automaticamente no perfil do usuário.
+Depois, habilite a extensão **AppIndicator and KStatusNotifierItem Support** (ou **Status Icons**, no GNOME 50) e encerre/inicie novamente a sessão. Essa extensão é uma integração do ambiente gráfico; o pacote do FTP File Synchronizer não deve ativá-la automaticamente no perfil do usuário.
 
 ### 1) Clonar o projeto
 
 ```bash
-git clone https://github.com/edenilsonmota/code-sync-ftp-electron.git
-cd code-sync-ftp-electron
+git clone https://github.com/edenilsonmota/ftp-file-synchronizer.git
+cd ftp-file-synchronizer
 ```
 
 ### 2) Rodar o app em modo desenvolvimento (GUI)
@@ -74,11 +91,18 @@ docker compose --profile dev up --build app-dev
 docker compose --profile build run --rm app-build
 ```
 
+Antes do build, você também pode executar as verificações automatizadas:
+
+```bash
+docker compose --profile dev run --rm app-dev npm run check
+docker compose --profile dev run --rm app-dev npm test
+```
+
 Os artefatos serão gerados em `dist/` no diretório do projeto, incluindo:
 
-- `CodeSyncFtp-<versao>.AppImage`
-- `code-sync-ftp_<versao>_amd64.deb`
-- `code-sync-ftp-<versao>-1-x86_64.pkg.tar.zst` para Arch Linux
+- `FTP File Synchronizer-<versao>.AppImage`
+- `ftp-file-synchronizer_<versao>_amd64.deb`
+- `ftp-file-synchronizer-<versao>-1-x86_64.pkg.tar.zst` para Arch Linux
 
 ### 4) Buildar ou rodar no Windows (local)
 
