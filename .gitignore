@@ -1,32 +1,3 @@
-# Java compilation and build output
-*.class
-*.jar
-*.war
-*.ear
-/out/
-/build/
-/target/
-
-# JVM crash logs
-hs_err_pid*
-replay_pid*
-
-# IntelliJ IDEA
-.idea/
-*.iml
-*.ipr
-*.iws
-
-# VS Code
+node_modules/
 .vscode/
-
-# jpackage output
-/dist/
-/jpackage-output/
-*.app/
-*.deb
-*.rpm
-*.dmg
-*.pkg
-*.msi
-*.exe
+dist/

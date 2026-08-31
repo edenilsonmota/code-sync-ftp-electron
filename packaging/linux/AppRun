@@ -1,3 +1,0 @@
-#!/bin/sh
-APPDIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec "$APPDIR/bin/FTPFileSynchronizer" "$@"

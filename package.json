@@ -1,0 +1,96 @@
+{
+  "name": "code-sync-ftp",
+  "productName": "CodeSyncFtp",
+  "desktopName": "code-sync-ftp.desktop",
+  "version": "1.7.1",
+  "description": "Ferramenta de sincronização FTP automática",
+  "author": {
+    "name": "Edenilson Mota",
+    "email": "edenilsonmota.job@gmail.com"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.edenilson.codesyncftp",
+    "productName": "CodeSyncFtp",
+    "executableName": "code-sync-ftp",
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "pacman"
+      ],
+      "icon": "build/icons",
+      "category": "Development",
+      "desktop": {
+        "Name": "CodeSyncFtp",
+        "StartupWMClass": "code-sync-ftp"
+      }
+    },
+    "pacman": {
+      "artifactName": "${name}-${version}-${arch}.pkg.tar.zst",
+      "depends": [
+        "gtk3",
+        "libnotify",
+        "nss",
+        "libxss",
+        "libxtst",
+        "xdg-utils",
+        "at-spi2-core"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "guid": "7e3ae7d1-cf32-4207-ab8a-d3c1a097531f",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "CodeSyncFtp"
+    },
+    "files": [
+      "**/*",
+      "!**/*.ts",
+      "!*.map",
+      "!**/*.md",
+      "!dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "icon.png",
+        "to": "icon.png"
+      },
+      {
+        "from": "icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "tray-icon.png",
+        "to": "tray-icon.png"
+      }
+    ]
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.0",
+    "chokidar": "^3.5.0",
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}
