@@ -2,7 +2,7 @@
   "name": "ftp-file-synchronizer",
   "productName": "FTP File Synchronizer",
   "desktopName": "ftp-file-synchronizer.desktop",
-  "version": "1.7.1",
+  "version": "2.0.0",
   "description": "Ferramenta de sincronização FTP automática",
   "author": {
     "name": "Edenilson Mota",
@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "check": "node --check main.js && node --check src/preload.js && node --check src/main/application.js && node --check src/main/config/application.js && node --check src/main/config/settings-repository.js && node --check src/main/ftp/ftp-service.js && node --check src/main/ipc/register-handlers.js && node --check src/main/sync/sync-service.js && node --check src/main/ui/tray-manager.js && node --check src/main/ui/window-manager.js && node --check src/renderer/renderer.js",
+    "check": "node --check main.js && node --check src/preload.js && node --check src/main/application.js && node --check src/main/config/application.js && node --check src/main/config/settings-repository.js && node --check src/main/ftp/ftp-service.js && node --check src/main/ipc/register-handlers.js && node --check src/main/sync/sync-service.js && node --check src/main/ui/window-manager.js && node --check src/renderer/renderer.js",
     "test": "node --test",
     "dist": "electron-builder"
   },
@@ -84,10 +84,6 @@
       {
         "from": "icon.ico",
         "to": "icon.ico"
-      },
-      {
-        "from": "tray-icon.png",
-        "to": "tray-icon.png"
       }
     ]
   },

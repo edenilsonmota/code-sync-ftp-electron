@@ -29,6 +29,7 @@ class SyncService {
         this.watcherFactory = watcherFactory;
         this.watchers = [];
         this.queue = [];
+        this.pendingTasks = new Map();
         this.isUploading = false;
         this.isSyncing = false;
         this.currentTask = null;
@@ -82,6 +83,7 @@ class SyncService {
         this.setSyncing(false);
         await this.stopWatchers();
         this.queue = [];
+        this.pendingTasks.clear();
         this.ftpService.close();
         if (this.processingPromise) await this.processingPromise.catch(() => {});
         this.isUploading = false;
@@ -98,12 +100,10 @@ class SyncService {
     }
 
     createWatcher(project, globalConfig, sessionId) {
-        const userIgnored = project.ignored
-            ? project.ignored.split(',').map(item => item.trim().toLowerCase()).filter(Boolean) : [];
         const watcher = this.watcherFactory(project.local, {
             ignored: [/node_modules/, /\.git/, /\.vscode/, /desktop\.ini/],
             persistent: true,
-            ignoreInitial: false,
+            ignoreInitial: true,
             followSymlinks: false,
             usePolling: false,
             awaitWriteFinish: { stabilityThreshold: 1200, pollInterval: 250 }
@@ -111,14 +111,6 @@ class SyncService {
 
         watcher.on('all', (event, fullPath) => {
             if (sessionId !== this.sessionId || event === 'addDir') return;
-            const fileName = path.basename(fullPath).toLowerCase();
-            const ignored = userIgnored.some(rule => (
-                rule.startsWith('*') ? fileName.endsWith(rule.slice(1)) : fileName === rule
-            ));
-            if (ignored) {
-                if (event !== 'unlink' && event !== 'unlinkDir') this.log(`Ignorado: ${path.basename(fullPath)}`, 'info');
-                return;
-            }
             const action = { add: 'upload', change: 'upload', unlink: 'delete_file', unlinkDir: 'delete_dir' }[event];
             if (action) this.enqueue(action, fullPath, project, globalConfig, sessionId);
         });
@@ -144,14 +136,15 @@ class SyncService {
         if (!this.isSyncing || sessionId !== this.sessionId) return;
         const task = { action, fullPath, projectConfig, globalConfig, sessionId };
         const key = this.taskKey(task);
-        const existingIndex = this.queue.findIndex(item => this.taskKey(item) === key);
-        if (existingIndex >= 0) {
-            this.queue[existingIndex] = task;
+        const existingTask = this.pendingTasks.get(key);
+        if (existingTask) {
+            Object.assign(existingTask, task);
         } else if (this.queue.length >= MAX_PENDING_TASKS) {
             this.log(`Fila cheia; alteração não enfileirada: ${fullPath}`, 'error');
             return;
         } else {
             this.queue.push(task);
+            this.pendingTasks.set(key, task);
         }
         if (!this.processingPromise) {
             this.processingPromise = this.processQueue().finally(() => { this.processingPromise = null; });
@@ -164,6 +157,8 @@ class SyncService {
         try {
             while (this.queue.length > 0) {
                 const task = this.queue.shift();
+                const key = this.taskKey(task);
+                if (this.pendingTasks.get(key) === task) this.pendingTasks.delete(key);
                 if (task.sessionId !== this.sessionId || !this.isSyncing) continue;
                 this.currentTask = task;
                 if (!await this.executeWithRetry(task)) failedTasks++;

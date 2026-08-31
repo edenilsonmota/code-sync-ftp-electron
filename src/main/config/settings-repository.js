@@ -27,8 +27,7 @@ class SettingsRepository {
             password: this.encryptPassword(config.password),
             projects: config.projects.map(project => ({
                 local: project.local,
-                remote: project.remote,
-                ignored: project.ignored || ''
+                remote: project.remote
             }))
         };
         this.store.set('config', safeConfig);

@@ -9,6 +9,8 @@ const remotePickerModal = document.getElementById('remotePickerModal');
 const remoteCurrentPath = document.getElementById('remoteCurrentPath');
 const remoteList = document.getElementById('remoteList');
 const MAX_LOG_ENTRIES = 500;
+const pendingLogs = [];
+let logFramePending = false;
 const remotePickerState = { targetInput: null, currentPath: '/', requestId: 0 };
 
 window.onload = async () => {
@@ -21,7 +23,7 @@ window.onload = async () => {
         document.getElementById('password').value = config.password || '';
         document.getElementById('port').value = config.port || 21;
         if (config.projects?.length) {
-            config.projects.forEach(project => addProjectRow(project.local, project.remote, project.ignored));
+            config.projects.forEach(project => addProjectRow(project.local, project.remote));
         } else addProjectRow();
         setSyncUiRunning(syncIsRunning);
     } catch (error) {
@@ -30,7 +32,7 @@ window.onload = async () => {
     }
 };
 
-function addProjectRow(localValue = '', remoteValue = '', ignoredValue = '') {
+function addProjectRow(localValue = '', remoteValue = '') {
     const row = document.createElement('div');
     row.className = 'project-row';
     row.innerHTML = `
@@ -42,11 +44,9 @@ function addProjectRow(localValue = '', remoteValue = '', ignoredValue = '') {
             <input type="text" placeholder="Pasta Remota (/web/...)" class="input-remote">
             <button class="btn-remote-folder">Escolher FTP</button>
         </div>
-        <input type="text" placeholder="Ignorar: *.log, .env" class="input-ignored">
         <button class="btn-remove">Remover</button>`;
     row.querySelector('.input-local').value = localValue;
     row.querySelector('.input-remote').value = remoteValue;
-    row.querySelector('.input-ignored').value = ignoredValue || '';
     row.querySelector('.btn-folder').addEventListener('click', event => selectFolder(event.currentTarget));
     row.querySelector('.btn-remote-folder').addEventListener('click', event => openRemotePicker(event.currentTarget));
     row.querySelector('.btn-remove').addEventListener('click', event => removeRow(event.currentTarget));
@@ -156,8 +156,7 @@ function collectConfig() {
     document.querySelectorAll('.project-row').forEach(row => {
         const local = row.querySelector('.input-local').value.trim();
         const remote = row.querySelector('.input-remote').value.trim();
-        const ignored = row.querySelector('.input-ignored').value.trim();
-        if (local && remote) config.projects.push({ local, remote, ignored });
+        if (local && remote) config.projects.push({ local, remote });
     });
     return config;
 }
@@ -202,10 +201,22 @@ async function toggleSync(start) {
 }
 
 function addLog(data) {
-    const item = document.createElement('div');
-    item.className = `log-item ${data.type}`;
-    item.innerText = `[${data.time}] ${data.msg}`;
-    logsDiv.prepend(item);
+    pendingLogs.push(data);
+    if (logFramePending) return;
+    logFramePending = true;
+    requestAnimationFrame(flushLogs);
+}
+
+function flushLogs() {
+    logFramePending = false;
+    const fragment = document.createDocumentFragment();
+    for (const data of pendingLogs.splice(0)) {
+        const item = document.createElement('div');
+        item.className = `log-item ${data.type}`;
+        item.innerText = `[${data.time}] ${data.msg}`;
+        fragment.prepend(item);
+    }
+    logsDiv.prepend(fragment);
     while (logsDiv.children.length > MAX_LOG_ENTRIES) logsDiv.lastElementChild.remove();
 }
 

@@ -23,7 +23,7 @@ Guidance for AI coding agents working in this repository.
 
 - Keep `main.js` as a minimal bootstrap.
 - Keep application composition and lifecycle in `src/main/application.js`.
-- Keep FTP operations in `src/main/ftp`, sync/watchers in `src/main/sync`, IPC registration in `src/main/ipc`, and window/tray behavior in `src/main/ui`.
+- Keep FTP operations in `src/main/ftp`, sync/watchers in `src/main/sync`, IPC registration in `src/main/ipc`, and window behavior in `src/main/ui`.
 - Keep the narrow, allow-listed IPC bridge in `src/preload.js`.
 - Keep renderer/UI logic in `src/renderer/renderer.js` and markup/styles in `src/renderer/index.html`.
 - Communicate between layers via existing IPC channels; prefer extending current channels over introducing parallel patterns.
@@ -35,14 +35,14 @@ Guidance for AI coding agents working in this repository.
   - `host`, `user`, `password`, `port`
   - `projects: [{ local, remote }]`
 - Sync state relies on these main-process flags: `isSyncing`, `isUploading`, `uploadQueue`, `watchers`.
-- When changing sync start/stop behavior, keep tray label updates and renderer button state transitions in sync.
+- When changing sync start/stop behavior, keep renderer button state transitions in sync.
 - User-facing strings are currently in Portuguese; keep language consistent unless asked to localize.
 
 ## Pitfalls And Safety Notes
 
 - Preserve `nodeIntegration: false`, `contextIsolation: true`, the sandbox, and the renderer Content Security Policy.
 - Preserve single-instance behavior (`app.requestSingleInstanceLock()`).
-- Preserve close/minimize-to-tray behavior when editing window lifecycle code.
+- Preserve the native window behavior: minimize to the taskbar and close to exit.
 - Always ensure watcher cleanup on stop/restart (`stopAllWatchers()`) to avoid duplicate watchers.
 
 ## Validation
@@ -50,5 +50,5 @@ Guidance for AI coding agents working in this repository.
 - Run `npm run check` and `npm test` for static and automated validation.
 - After code changes, validate by running the app with `npm start` and manually checking:
   - start/stop sync flow
-  - tray actions (open/start-stop/exit)
+  - native minimize, maximize, restore, and close actions
   - log updates in renderer

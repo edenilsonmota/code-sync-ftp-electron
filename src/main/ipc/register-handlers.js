@@ -26,12 +26,11 @@ function validateConfig(config, { requireProjects = true } = {}) {
     const projects = Array.isArray(config.projects) ? config.projects.map(project => {
         const local = path.resolve(String(project.local || ''));
         const remote = String(project.remote || '').trim();
-        const ignored = String(project.ignored || '').trim();
         if (!project.local || !remote) throw new Error('Mapeamento de pasta inválido.');
         if (!fs.existsSync(local) || !fs.statSync(local).isDirectory()) {
             throw new Error(`Pasta local inexistente ou inacessível: ${local}`);
         }
-        return { local, remote, ignored };
+        return { local, remote };
     }) : [];
     if (requireProjects && projects.length === 0) throw new Error('Adicione pelo menos um projeto válido.');
     return { ...connection, projects };

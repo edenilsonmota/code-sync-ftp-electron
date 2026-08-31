@@ -25,11 +25,10 @@ As credenciais são protegidas pelo armazenamento seguro do sistema operacional 
 ## Funcionalidades
 
 - Monitoramento e sincronização de arquivos em tempo real;
-- sincronização inicial dos arquivos existentes;
+- sincronização somente de alterações ocorridas após iniciar o monitoramento;
 - espelhamento de exclusões locais no servidor;
 - múltiplos mapeamentos local/remoto;
-- regras de arquivos ignorados por projeto;
-- execução em segundo plano pela bandeja do sistema;
+- comportamento normal de minimizar, maximizar e fechar a janela;
 - suporte a Windows, Linux e macOS.
 
 ## Instalação
@@ -47,7 +46,7 @@ Acesse a página de [Releases](https://github.com/edenilsonmota/ftp-file-synchro
 3. Clique em **INICIAR**.
 4. Trabalhe normalmente no seu editor; as mudanças serão sincronizadas.
 
-Ao fechar a janela, o aplicativo continua na bandeja. Para encerrá-lo, use a opção **Sair** no menu do ícone.
+Ao minimizar, o aplicativo permanece na barra de tarefas. Ao fechar a janela, o aplicativo e a sincronização são encerrados.
 
 ## Desenvolvimento
 
@@ -95,16 +94,6 @@ npm run dist -- --mac
 ```
 
 O build deve ser feito preferencialmente no próprio sistema de destino. Builds para outras plataformas podem exigir ferramentas adicionais, como Wine para gerar o instalador Windows a partir do Linux. Os artefatos são gravados em `dist/`.
-
-### Ícone de bandeja no GNOME
-
-O Electron publica o ícone pelo protocolo StatusNotifierItem. Caso o GNOME não o exiba, instale e habilite o suporte a AppIndicator:
-
-```bash
-sudo apt install gnome-shell-extension-appindicator
-```
-
-Depois, habilite **AppIndicator and KStatusNotifierItem Support** (ou **Status Icons**, no GNOME 50) e reinicie a sessão gráfica.
 
 ## Agradecimentos
 

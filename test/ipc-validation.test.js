@@ -13,14 +13,14 @@ test('valida conexão e converte porta', () => {
     assert.throws(() => validateConnection({ host: 'host', user: 'user', port: 70000 }));
 });
 
-test('valida diretório local e preserva regra de ignore', () => {
+test('valida diretório local', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ftp-sync-'));
     try {
         const config = validateConfig({
             host: 'host', user: 'user', password: '', port: 21,
-            projects: [{ local: directory, remote: '/site', ignored: '*.log' }]
+            projects: [{ local: directory, remote: '/site' }]
         });
         assert.equal(config.projects[0].local, path.resolve(directory));
-        assert.equal(config.projects[0].ignored, '*.log');
+        assert.deepEqual(config.projects[0], { local: path.resolve(directory), remote: '/site' });
     } finally { fs.rmSync(directory, { recursive: true }); }
 });

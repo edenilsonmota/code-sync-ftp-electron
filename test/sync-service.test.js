@@ -50,6 +50,34 @@ test('não perde uma alteração ocorrida durante upload', async () => {
     assert.equal(uploads, 2);
 });
 
+test('substitui em tempo constante uma alteração ainda pendente', async () => {
+    const service = new SyncService({
+        ftpService: { close() {} }, log() {}, onStateChange() {}, watcherFactory: fakeWatcher
+    });
+    service.isSyncing = true;
+    service.sessionId = 1;
+    service.processingPromise = Promise.resolve();
+    const project = { local: '/project', remote: '/remote' };
+    service.enqueue('upload', '/project/file.js', project, {}, 1);
+    service.enqueue('delete_file', '/project/file.js', project, {}, 1);
+    assert.equal(service.queue.length, 1);
+    assert.equal(service.queue[0].action, 'delete_file');
+    assert.equal(service.pendingTasks.size, 1);
+});
+
+test('não envia arquivos já existentes ao iniciar o monitoramento', () => {
+    let watcherOptions;
+    const watcherFactory = (_localPath, options) => {
+        watcherOptions = options;
+        return fakeWatcher();
+    };
+    const service = new SyncService({
+        ftpService: { close() {} }, log() {}, onStateChange() {}, watcherFactory
+    });
+    service.createWatcher({ local: '/project', remote: '/remote' }, {}, 1);
+    assert.equal(watcherOptions.ignoreInitial, true);
+});
+
 test('parar invalida a sessão e limpa tarefas pendentes', async () => {
     let releaseUpload;
     const pendingUpload = new Promise(resolve => { releaseUpload = resolve; });
@@ -69,5 +97,6 @@ test('parar invalida a sessão e limpa tarefas pendentes', async () => {
     await service.stop();
     assert.equal(uploads, 1);
     assert.equal(service.queue.length, 0);
+    assert.equal(service.pendingTasks.size, 0);
     assert.equal(service.getState(), false);
 });

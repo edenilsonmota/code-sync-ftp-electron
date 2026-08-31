@@ -3,11 +3,9 @@ const { BrowserWindow } = require('electron');
 const { getRuntimeAssetPath } = require('../config/application');
 
 class WindowManager {
-    constructor(app, isQuitting) {
+    constructor(app) {
         this.app = app;
-        this.isQuitting = isQuitting;
         this.mainWindow = null;
-        this.recreateOnNextShow = false;
     }
 
     getWindow() { return this.mainWindow; }
@@ -40,44 +38,14 @@ class WindowManager {
             if (level >= 2) console.error(`[Renderer] ${message}`);
         });
         createdWindow.loadFile(path.resolve(__dirname, '../../renderer/index.html'));
-        createdWindow.on('close', event => {
-            if (!this.isQuitting()) { event.preventDefault(); this.hide('close'); }
-        });
-        createdWindow.on('minimize', event => {
-            event.preventDefault();
-            this.hide('minimize');
-        });
-        createdWindow.on('show', () => {
-            if (process.platform === 'win32') createdWindow.setSkipTaskbar(false);
-            if (process.platform === 'darwin') this.app.dock.show();
-        });
         createdWindow.on('closed', () => {
             if (this.mainWindow === createdWindow) this.mainWindow = null;
         });
         return createdWindow;
     }
 
-    hide(source) {
-        if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
-        console.log(`[Janela] Ocultando (${source}).`);
-        const window = this.mainWindow;
-        window.hide();
-        if (process.platform === 'linux') {
-            this.recreateOnNextShow = true;
-            setImmediate(() => { if (!window.isDestroyed()) window.destroy(); });
-        } else if (process.platform === 'win32') {
-            window.setSkipTaskbar(true);
-        }
-    }
-
     show(source) {
         console.log(`[Janela] Solicitação para exibir (${source}).`);
-        if (process.platform === 'linux' && this.recreateOnNextShow) {
-            const hiddenWindow = this.mainWindow;
-            this.recreateOnNextShow = false;
-            if (hiddenWindow && !hiddenWindow.isDestroyed()) hiddenWindow.destroy();
-            if (this.mainWindow === hiddenWindow) this.mainWindow = null;
-        }
         if (!this.mainWindow || this.mainWindow.isDestroyed()) this.create();
         if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
         const window = this.mainWindow;
@@ -96,10 +64,9 @@ class WindowManager {
 
     reveal(window, source) {
         if (!window || window.isDestroyed()) return;
-        if (process.platform === 'win32') window.setSkipTaskbar(false);
         if (!window.isVisible()) { console.log(`[Janela] Exibindo (${source}).`); window.show(); }
         if (process.platform === 'darwin') this.app.dock.show();
-        if (process.platform !== 'linux') window.focus();
+        window.focus();
     }
 
     send(channel, payload) {
